@@ -467,62 +467,73 @@ public class EgovArticleController {
             return "egovframework/com/uat/uia/EgovLoginUsr";
         }
 		
-		beanValidator.validate(board, bindingResult);
-		if (bindingResult.hasErrors()) {
-		    BoardMasterVO master = new BoardMasterVO();
-		    
-		    master.setBbsId(boardVO.getBbsId());
-		    master.setUniqId((user == null || user.getUniqId() == null) ? "" : user.getUniqId());
-	
-		    master = egovBBSMasterService.selectBBSMasterInf(master);
-		    
-	
-		    //----------------------------
-		    // 기본 BBS template 지정 
-		    //----------------------------
-		    if (master.getTmplatCours() == null || master.getTmplatCours().equals("")) {
-			master.setTmplatCours("/css/egovframework/com/cop/tpl/egovBaseTemplate.css");
-		    }
-	
-		    model.addAttribute("articleVO", boardVO);
-		    model.addAttribute("boardMasterVO", master);
-		    ////-----------------------------
-	
-		    return "egovframework/com/cop/bbs/EgovArticleReply";
-		}
-	
-		if (isAuthenticated) {
-		    //final Map<String, MultipartFile> files = multiRequest.getFileMap();
-		    final List<MultipartFile> files = multiRequest.getFiles("file_1");
-		    String atchFileId = "";
-	
-		    if (!files.isEmpty()) {
-				List<FileVO> result = fileUtil.parseFileInf(files, "BBS_", 0, "", "");
-				atchFileId = fileMngService.insertFileInfs(result);
-		    }
-	
-		    board.setAtchFileId(atchFileId);
-		    board.setReplyAt("Y");
-		    board.setFrstRegisterId((user == null || user.getUniqId() == null) ? "" : user.getUniqId());
-		    board.setBbsId(board.getBbsId());
-		    board.setParnts(Long.toString(boardVO.getNttId()));
-		    board.setSortOrdr(boardVO.getSortOrdr());
-		    board.setReplyLc(Integer.toString(Integer.parseInt(boardVO.getReplyLc()) + 1));
-		    
-		    //익명등록 처리 
-		    if(board.getAnonymousAt() != null && board.getAnonymousAt().equals("Y")){
-		    	board.setNtcrId("anonymous"); //게시물 통계 집계를 위해 등록자 ID 저장
-		    	board.setNtcrNm("익명"); //게시물 통계 집계를 위해 등록자 Name 저장
-		    	board.setFrstRegisterId("anonymous");
-		    	
-		    } else {
-		    	board.setNtcrId((user == null || user.getId() == null) ? "" : user.getId()); //게시물 통계 집계를 위해 등록자 ID 저장
-		    	board.setNtcrNm((user == null || user.getName() == null) ? "" : user.getName()); //게시물 통계 집계를 위해 등록자 Name 저장
-		    	
-		    }
-		    board.setNttCn(unscript(board.getNttCn()));	// XSS 방지
-		    
-		    egovArticleService.insertArticle(board);
+		// 비밀 게시글 답변은 홈페이지 운영자 또는 게시글 작성자로 한정
+		BoardVO vo = egovArticleService.selectArticleDetail(boardVO);
+
+		if (vo.getSecretAt().equals("Y")) {
+			if (user.getOrgnztId().equals("ORGNZT_0000000000000") || user.getUniqId().equals(vo.getFrstRegisterId())) {
+				beanValidator.validate(board, bindingResult);
+				if (bindingResult.hasErrors()) {
+					BoardMasterVO master = new BoardMasterVO();
+
+					master.setBbsId(boardVO.getBbsId());
+					master.setUniqId((user == null || user.getUniqId() == null) ? "" : user.getUniqId());
+
+					master = egovBBSMasterService.selectBBSMasterInf(master);
+
+					// ----------------------------
+					// 기본 BBS template 지정
+					// ----------------------------
+					if (master.getTmplatCours() == null || master.getTmplatCours().equals("")) {
+						master.setTmplatCours("/css/egovframework/com/cop/tpl/egovBaseTemplate.css");
+					}
+
+					model.addAttribute("articleVO", boardVO);
+					model.addAttribute("boardMasterVO", master);
+					//// -----------------------------
+
+					return "egovframework/com/cop/bbs/EgovArticleReply";
+				}
+
+				if (isAuthenticated) {
+					// final Map<String, MultipartFile> files = multiRequest.getFileMap();
+					final List<MultipartFile> files = multiRequest.getFiles("file_1");
+					String atchFileId = "";
+
+					if (!files.isEmpty()) {
+						List<FileVO> result = fileUtil.parseFileInf(files, "BBS_", 0, "", "");
+						atchFileId = fileMngService.insertFileInfs(result);
+					}
+
+					board.setAtchFileId(atchFileId);
+					board.setReplyAt("Y");
+					board.setFrstRegisterId((user == null || user.getUniqId() == null) ? "" : user.getUniqId());
+					board.setBbsId(board.getBbsId());
+					board.setParnts(Long.toString(boardVO.getNttId()));
+					board.setSortOrdr(boardVO.getSortOrdr());
+					board.setReplyLc(Integer.toString(Integer.parseInt(boardVO.getReplyLc()) + 1));
+
+					// 익명등록 처리
+					if (board.getAnonymousAt() != null && board.getAnonymousAt().equals("Y")) {
+						board.setNtcrId("anonymous"); // 게시물 통계 집계를 위해 등록자 ID 저장
+						board.setNtcrNm("익명"); // 게시물 통계 집계를 위해 등록자 Name 저장
+						board.setFrstRegisterId("anonymous");
+
+					} else {
+						board.setNtcrId((user == null || user.getId() == null) ? "" : user.getId()); // 게시물 통계 집계를 위해
+																										// 등록자 ID 저장
+						board.setNtcrNm((user == null || user.getName() == null) ? "" : user.getName()); // 게시물 통계 집계를
+																											// 위해 등록자
+																											// Name 저장
+
+					}
+					board.setNttCn(unscript(board.getNttCn())); // XSS 방지
+
+					egovArticleService.insertArticle(board);
+				}
+			} else {
+				return "forward:/cop/bbs/selectArticleList.do";
+			}
 		}
 		
 		return "forward:/cop/bbs/selectArticleList.do";
